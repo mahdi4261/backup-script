@@ -86,6 +86,30 @@ if ! pgrep -x "syncthing" >/dev/null 2>&1; then
     sleep 2
 fi
 
+echo "=== 8. Configuring and starting automated cron job ==="
+BASH_PATH="$(command -v bash || echo "${PREFIX:-/data/data/com.termux/files/usr}/bin/bash")"
+CRON_ENTRY="*/5 * * * * $BASH_PATH $HOME/backup.sh >/dev/null 2>&1"
+
+if command -v crontab >/dev/null 2>&1; then
+    # Add cron job if not already present
+    if ! crontab -l 2>/dev/null | grep -Fq "backup.sh"; then
+        (crontab -l 2>/dev/null || true; echo "$CRON_ENTRY") | crontab -
+        echo "Configured crontab to run backup.sh every 5 minutes."
+    else
+        echo "Cron job for backup.sh is already configured in crontab."
+    fi
+fi
+
+# Ensure crond daemon is running in the background
+if command -v crond >/dev/null 2>&1; then
+    if ! pgrep -x "crond" >/dev/null 2>&1; then
+        crond
+        echo "Started crond daemon in the background."
+    else
+        echo "crond daemon is already running."
+    fi
+fi
+
 echo "=============================================================================="
 echo " Setup Completed Successfully!"
 echo "=============================================================================="
@@ -95,13 +119,15 @@ echo "  - $HOME/restore.sh         (Multi-part restore & decryption utility)"
 echo "  - $HOME/backup_public_key.pem (Public key certificate)"
 echo ""
 echo " Background Services:"
-echo "  - Termux Wake Lock: Active (keeps CPU running when screen is locked)"
-echo "  - Syncthing: Running in background (browser auto-open disabled)"
-echo "  - Syncthing Web UI: http://127.0.0.1:8384"
+echo "  - Automated Cron Job: Active (scanning for pendrives every 5 minutes)"
+echo "  - Termux Wake Lock:   Active (keeps CPU running when screen is locked)"
+echo "  - Syncthing:          Running in background (browser auto-open disabled)"
+echo "  - Syncthing Web UI:   http://127.0.0.1:8384"
 echo ""
 echo " Quick Commands:"
-echo "  - Run backup now:   bash ~/backup.sh"
-echo "  - Pair Syncthing:   Open http://127.0.0.1:8384 in your phone browser"
+echo "  - Run backup now:     bash ~/backup.sh"
+echo "  - Check cron status:  crontab -l"
+echo "  - Pair Syncthing:     Open http://127.0.0.1:8384 in your phone browser"
 echo ""
 echo " Note: In Android Settings -> Apps -> Termux -> Battery, select 'Unrestricted'."
 echo "=============================================================================="

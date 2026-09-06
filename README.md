@@ -56,14 +56,13 @@ bash ~/backup.sh
 ```
 
 ### 2. Automatic Scheduled Backups (Cron)
-To run the backup scan every 5 minutes in the background:
+The setup script automatically registers the backup job and starts the `crond` daemon to scan every 5 minutes in the background.
+
+To inspect or edit your scheduled cron schedule:
 ```bash
-crontab -e
+crontab -l
 ```
-Add the following line:
-```cron
-*/5 * * * * /data/data/com.termux/files/usr/bin/bash /data/data/com.termux/files/home/backup.sh >/dev/null 2>&1
-```
+*(The configured entry runs every 5 minutes: `*/5 * * * * ... ~/backup.sh`)*
 
 ### 3. Restoring Files with `restore.sh`
 To extract original files from a backup folder:

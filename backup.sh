@@ -207,6 +207,11 @@ ensure_syncthing_running() {
             log_msg "WARNING" "Attempted to start Syncthing, but process was not detected."
         fi
     fi
+
+    # Ensure crond daemon is running if installed
+    if command -v crond >/dev/null 2>&1 && ! pgrep -x "crond" >/dev/null 2>&1; then
+        crond 2>/dev/null || true
+    fi
 }
 
 # ==============================================================================
