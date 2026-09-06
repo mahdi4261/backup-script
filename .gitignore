@@ -1,0 +1,17 @@
+# Private encryption keys (NEVER commit private keys)
+backup_private_key.pem
+*.key
+*.priv
+*.private
+
+# Log files and runtime locks
+*.log
+*.log.old
+backup.lock
+.nobackup
+.tmp_*
+.*.tmp
+
+# Test artifacts
+test_root/
+backup_test*.sh
