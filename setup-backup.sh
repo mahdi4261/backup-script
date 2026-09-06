@@ -110,6 +110,34 @@ if command -v crond >/dev/null 2>&1; then
     fi
 fi
 
+echo "=== 9. Configuring auto-start on Termux launch and boot ==="
+BASHRC="$HOME/.bashrc"
+AUTOSTART_MARKER="# Pendrive Backup & Syncthing background services"
+
+if ! grep -Fq "$AUTOSTART_MARKER" "$BASHRC" 2>/dev/null; then
+    cat >> "$BASHRC" << 'EOF'
+
+# Pendrive Backup & Syncthing background services
+termux-wake-lock 2>/dev/null || true
+pgrep -x "crond" >/dev/null 2>&1 || crond
+pgrep -x "syncthing" >/dev/null 2>&1 || nohup syncthing --no-browser --no-restart > "$HOME/.logs/syncthing.log" 2>&1 &
+EOF
+    echo "Added auto-start hook to ~/.bashrc (starts crond & Syncthing whenever Termux opens)."
+fi
+
+# Configure Termux:Boot script (runs on device reboot if Termux:Boot app is installed)
+mkdir -p "$HOME/.termux/boot"
+cat > "$HOME/.termux/boot/start-backup-services.sh" << 'EOF'
+#!/usr/bin/env bash
+termux-wake-lock 2>/dev/null || true
+pgrep -x "crond" >/dev/null 2>&1 || crond
+pgrep -x "syncthing" >/dev/null 2>&1 || nohup syncthing --no-browser --no-restart > "$HOME/.logs/syncthing.log" 2>&1 &
+EOF
+chmod +x "$HOME/.termux/boot/start-backup-services.sh"
+if command -v termux-fix-shebang >/dev/null 2>&1; then
+    termux-fix-shebang "$HOME/.termux/boot/start-backup-services.sh" 2>/dev/null || true
+fi
+
 echo "=============================================================================="
 echo " Setup Completed Successfully!"
 echo "=============================================================================="
