@@ -26,12 +26,12 @@ print_usage() {
     echo ""
     echo "Examples:"
     echo "  # Restore unencrypted backup:"
-    echo "  $0 ~/storage/shared/Backups/8A6E-8771"
-    echo "  $0 ~/storage/shared/Backups/8A6E-8771 /path/to/extracted_files"
+    echo "  $0 ~/storage/shared/.backups/8A6E-8771"
+    echo "  $0 ~/storage/shared/.backups/8A6E-8771 /path/to/extracted_files"
     echo ""
     echo "  # Restore encrypted backup:"
-    echo "  $0 ~/storage/shared/Backups/8A6E-8771 ~/backup_private_key.pem"
-    echo "  $0 ~/storage/shared/Backups/8A6E-8771 ~/backup_private_key.pem /path/to/extracted_files"
+    echo "  $0 ~/storage/shared/.backups/8A6E-8771 ~/backup_private_key.pem"
+    echo "  $0 ~/storage/shared/.backups/8A6E-8771 ~/backup_private_key.pem /path/to/extracted_files"
     echo "=============================================================================="
 }
 

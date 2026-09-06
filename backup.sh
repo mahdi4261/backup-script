@@ -137,7 +137,6 @@ setup_backup_dir() {
         "$HOME/storage/shared/.backups"
         "$HOME/storage/shared/Documents/.backups"
         "$HOME/storage/shared/Download/.backups"
-        "$HOME/storage/shared/Backups"
     )
     for d in "${dirs[@]}"; do
         if mkdir -p "$d" 2>/dev/null && [ -w "$d" ]; then
@@ -363,11 +362,8 @@ while read -r fs blocks used avail percent mount; do
         if [ -d "$target_dir" ] && compgen -G "$target_dir/part-*" > /dev/null; then
             log_msg "INFO" "Backup already exists for pendrive $uuid at $target_dir. Skipping copy."
             continue
-        elif [ -d "$HOME/storage/shared/Backups/$uuid" ] && compgen -G "$HOME/storage/shared/Backups/$uuid/part-*" > /dev/null; then
-            log_msg "INFO" "Backup already exists for pendrive $uuid in legacy folder $HOME/storage/shared/Backups/$uuid. Skipping copy."
-            continue
         elif [ -f "$BACKUP_DIR/${uuid}.zip.enc" ] || [ -f "$BACKUP_DIR/${uuid}.zip" ]; then
-            log_msg "INFO" "Legacy backup file already exists for pendrive $uuid at $BACKUP_DIR/${uuid}.zip*. Skipping copy."
+            log_msg "INFO" "Backup archive already exists for pendrive $uuid at $BACKUP_DIR/${uuid}.zip*. Skipping copy."
             continue
         fi
         
