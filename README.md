@@ -21,7 +21,7 @@ pkg upgrade -y && pkg install git -y && git clone https://github.com/mahdi4261/b
 
 ## ✨ Features
 
-- **Dedicated Folders per Drive**: Each pendrive is backed up into its own folder: `~/storage/shared/Backups/<UUID>/`.
+- **Dedicated Folders per Drive**: Each pendrive is backed up into its own folder: `~/storage/shared/.backups/<UUID>/`.
 - **~500MB Multi-Part Splitting**: Archives are chunked into 500MB parts (`part-001`, `part-002`, ...), overcoming the 4GB FAT32 Android file limit.
 - **In-Memory Streaming**: Zero multi-gigabyte temporary files on disk; compression, encryption, and splitting stream directly through memory pipelines.
 - **Hybrid RSA + AES Encryption (Optional)**: Secures pendrive data using public-key hybrid encryption before storing or syncing.
@@ -69,10 +69,10 @@ To extract original files from a backup folder:
 
 ```bash
 # For unencrypted backups:
-./restore.sh ~/storage/shared/Backups/<UUID> [destination_folder]
+./restore.sh ~/storage/shared/.backups/<UUID> [destination_folder]
 
 # For encrypted backups (with your private key):
-./restore.sh ~/storage/shared/Backups/<UUID> ~/backup_private_key.pem [destination_folder]
+./restore.sh ~/storage/shared/.backups/<UUID> ~/backup_private_key.pem [destination_folder]
 ```
 
 ---
@@ -82,7 +82,7 @@ To extract original files from a backup folder:
 1. Open your phone's browser to **`http://127.0.0.1:8384`**.
 2. Click **Actions** $\to$ **Show ID** to view your phone's Syncthing Device ID.
 3. On your remote PC / Server, install Syncthing and click **Add Remote Device**, then paste your phone's Device ID.
-4. On your phone, add folder `~/storage/shared/Backups` (or `/storage/emulated/0/Backups`), check the box for your remote PC under **Sharing**, and set Folder Type to **Send Only**.
+4. On your phone, add folder `~/storage/shared/.backups` (or `/storage/emulated/0/.backups`), check the box for your remote PC under **Sharing**, and set Folder Type to **Send Only**.
 5. Accept the folder on your PC as **Receive Only** to automatically mirror all pendrive backups!
 
 ---

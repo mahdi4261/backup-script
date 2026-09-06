@@ -16,7 +16,7 @@ rm -rf "$TEST_ROOT"
 rm -f "$WORKSPACE/backup_test.sh" "$WORKSPACE/backup_test_enc.sh"
 
 mkdir -p "$TEST_ROOT/home/storage"
-mkdir -p "$TEST_ROOT/home/storage/shared/Backups"
+mkdir -p "$TEST_ROOT/home/storage/shared/.backups"
 mkdir -p "$TEST_ROOT/home/.logs"
 mkdir -p "$TEST_ROOT/storage/831E-10EC/Android/data/com.termux/files"
 mkdir -p "$TEST_ROOT/storage/8A6E-8771/subfolder"
@@ -62,10 +62,10 @@ echo "======================================================================"
 HOME="$TEST_ROOT/home" "$WORKSPACE/backup_test.sh"
 
 echo "Verification 1.1: Checking created backup folder & parts"
-test -d "$TEST_ROOT/home/storage/shared/Backups/8A6E-8771"
-ls -la "$TEST_ROOT/home/storage/shared/Backups/8A6E-8771/"
+test -d "$TEST_ROOT/home/storage/shared/.backups/8A6E-8771"
+ls -la "$TEST_ROOT/home/storage/shared/.backups/8A6E-8771/"
 
-PART_COUNT=$(ls -1 "$TEST_ROOT/home/storage/shared/Backups/8A6E-8771"/part-* | wc -l)
+PART_COUNT=$(ls -1 "$TEST_ROOT/home/storage/shared/.backups/8A6E-8771"/part-* | wc -l)
 echo "Generated $PART_COUNT parts for pendrive 8A6E-8771."
 if [ "$PART_COUNT" -lt 2 ]; then
     echo "ERROR: Expected at least 2 parts, got $PART_COUNT"
@@ -74,7 +74,7 @@ fi
 
 echo "Verification 1.2: Restoring unencrypted backup with restore.sh..."
 RESTORE_OUT_1="$TEST_ROOT/restored_8A6E-8771"
-"$WORKSPACE/restore.sh" "$TEST_ROOT/home/storage/shared/Backups/8A6E-8771" "$RESTORE_OUT_1"
+"$WORKSPACE/restore.sh" "$TEST_ROOT/home/storage/shared/.backups/8A6E-8771" "$RESTORE_OUT_1"
 
 echo "Verification 1.3: Comparing restored files byte-for-byte with original source..."
 diff -r "$TEST_ROOT/storage/8A6E-8771" "$RESTORE_OUT_1"
@@ -93,13 +93,13 @@ sed -i "s|8A6E-8771|1234-5678|g" "$WORKSPACE/backup_test_enc.sh"
 HOME="$TEST_ROOT/home" "$WORKSPACE/backup_test_enc.sh"
 
 echo "Verification 2.1: Checking encrypted backup directory contents..."
-test -d "$TEST_ROOT/home/storage/shared/Backups/1234-5678"
-test -f "$TEST_ROOT/home/storage/shared/Backups/1234-5678/key.enc"
-ls -la "$TEST_ROOT/home/storage/shared/Backups/1234-5678/"
+test -d "$TEST_ROOT/home/storage/shared/.backups/1234-5678"
+test -f "$TEST_ROOT/home/storage/shared/.backups/1234-5678/key.enc"
+ls -la "$TEST_ROOT/home/storage/shared/.backups/1234-5678/"
 
 echo "Verification 2.2: Restoring encrypted backup with restore.sh..."
 RESTORE_OUT_2="$TEST_ROOT/restored_1234-5678"
-"$WORKSPACE/restore.sh" "$TEST_ROOT/home/storage/shared/Backups/1234-5678" "$TEST_ROOT/home/backup_private_key.pem" "$RESTORE_OUT_2"
+"$WORKSPACE/restore.sh" "$TEST_ROOT/home/storage/shared/.backups/1234-5678" "$TEST_ROOT/home/backup_private_key.pem" "$RESTORE_OUT_2"
 
 echo "Verification 2.3: Comparing restored encrypted files byte-for-byte with original..."
 diff -r "$TEST_ROOT/storage/1234-5678" "$RESTORE_OUT_2"

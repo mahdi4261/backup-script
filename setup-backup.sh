@@ -66,8 +66,8 @@ if command -v termux-fix-shebang >/dev/null 2>&1; then
 fi
 
 echo "=== 6. Setting up Syncthing ignore rules (.stignore) ==="
-mkdir -p "$HOME/storage/shared/Backups" "$HOME/Backups"
-for bdir in "$HOME/storage/shared/Backups" "$HOME/Backups"; do
+mkdir -p "$HOME/storage/shared/.backups" "$HOME/.backups"
+for bdir in "$HOME/storage/shared/.backups" "$HOME/.backups"; do
     if [ -d "$bdir" ]; then
         cat > "$bdir/.stignore" << 'EOF'
 .tmp_*
@@ -127,7 +127,7 @@ echo ""
 echo " Quick Commands:"
 echo "  - Run backup now:     bash ~/backup.sh"
 echo "  - Check cron status:  crontab -l"
-echo "  - Pair Syncthing:     Open http://127.0.0.1:8384 in your phone browser"
+echo "  - Pair Syncthing:     Open http://127.0.0.1:8384 in your phone browser and share ~/storage/shared/.backups"
 echo ""
 echo " Note: In Android Settings -> Apps -> Termux -> Battery, select 'Unrestricted'."
 echo "=============================================================================="

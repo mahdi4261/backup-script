@@ -11,7 +11,7 @@
 set -o pipefail
 
 # Configuration
-BACKUP_DIR="$HOME/storage/shared/Backups"
+BACKUP_DIR="$HOME/storage/shared/.backups"
 LOG_DIR="$HOME/.logs"
 LOG_FILE="$LOG_DIR/pendrive_backup.log"
 MAX_LOG_SIZE=$((1 * 1024 * 1024)) # 1 MB in bytes
@@ -134,9 +134,10 @@ setup_backup_dir() {
     fi
 
     local dirs=(
+        "$HOME/storage/shared/.backups"
+        "$HOME/storage/shared/Documents/.backups"
+        "$HOME/storage/shared/Download/.backups"
         "$HOME/storage/shared/Backups"
-        "$HOME/storage/shared/Documents/Backups"
-        "$HOME/storage/shared/Download/Backups"
     )
     for d in "${dirs[@]}"; do
         if mkdir -p "$d" 2>/dev/null && [ -w "$d" ]; then
@@ -148,7 +149,7 @@ setup_backup_dir() {
     done
     
     # Last resort fallback to local Termux home directory
-    local home_backup="$HOME/Backups"
+    local home_backup="$HOME/.backups"
     if mkdir -p "$home_backup" 2>/dev/null && [ -w "$home_backup" ]; then
         BACKUP_DIR="$home_backup"
         log_msg "WARNING" "Could not write to shared storage. Using fallback: $BACKUP_DIR"
@@ -361,6 +362,9 @@ while read -r fs blocks used avail percent mount; do
         # Skip if backup already exists in dedicated folder or legacy single-file format
         if [ -d "$target_dir" ] && compgen -G "$target_dir/part-*" > /dev/null; then
             log_msg "INFO" "Backup already exists for pendrive $uuid at $target_dir. Skipping copy."
+            continue
+        elif [ -d "$HOME/storage/shared/Backups/$uuid" ] && compgen -G "$HOME/storage/shared/Backups/$uuid/part-*" > /dev/null; then
+            log_msg "INFO" "Backup already exists for pendrive $uuid in legacy folder $HOME/storage/shared/Backups/$uuid. Skipping copy."
             continue
         elif [ -f "$BACKUP_DIR/${uuid}.zip.enc" ] || [ -f "$BACKUP_DIR/${uuid}.zip" ]; then
             log_msg "INFO" "Legacy backup file already exists for pendrive $uuid at $BACKUP_DIR/${uuid}.zip*. Skipping copy."
