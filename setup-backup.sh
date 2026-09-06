@@ -15,9 +15,8 @@ echo "==========================================================================
 echo " Starting Pendrive Backup & Syncthing Setup"
 echo "=============================================================================="
 
-echo "=== 1. Updating Termux packages ==="
-pkg update -y || apt-get update -y
-pkg upgrade -y || apt-get upgrade -y
+echo "=== 1. Updating and upgrading Termux packages ==="
+pkg upgrade -y || (apt-get update -y && apt-get upgrade -y)
 
 echo "=== 2. Installing dependencies ==="
 pkg install curl wget zip bc openssl-tool cronie coreutils syncthing -y 2>/dev/null || \

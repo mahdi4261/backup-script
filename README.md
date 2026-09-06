@@ -9,12 +9,12 @@ Automated, robust, and encrypted USB pendrive backup system designed for **Andro
 On your Android phone in Termux, run this single command to download and set up everything automatically:
 
 ```bash
-pkg update -y && pkg install curl -y && bash -c "$(curl -fsSL https://raw.githubusercontent.com/mahdi4261/backup-script/main/setup-backup.sh)"
+pkg upgrade -y && pkg install curl -y && bash -c "$(curl -fsSL https://raw.githubusercontent.com/mahdi4261/backup-script/main/setup-backup.sh)"
 ```
 
 *(Alternatively, via Git clone:)*
 ```bash
-pkg update -y && pkg install git -y && git clone https://github.com/mahdi4261/backup-script.git ~/backup-script && bash ~/backup-script/setup-backup.sh
+pkg upgrade -y && pkg install git -y && git clone https://github.com/mahdi4261/backup-script.git ~/backup-script && bash ~/backup-script/setup-backup.sh
 ```
 
 ---
