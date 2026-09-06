@@ -30,7 +30,7 @@ MANUAL_EXCLUDED_UUIDS=()
 SKIP_FILE_NAME=".nobackup"
 
 # Encryption settings
-ENCRYPT_BACKUPS=false
+ENCRYPT_BACKUPS=true
 PUBKEY_PATH="$HOME/backup_public_key.pem"
 
 # Syncthing integration settings

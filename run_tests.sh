@@ -50,6 +50,8 @@ sed -i "s|\^/storage/|^${ESC_TEST_ROOT}/storage/|g" "$WORKSPACE/backup_test.sh"
 sed -i "s|/storage/([A-Za-z0-9]|${ESC_TEST_ROOT}/storage/([A-Za-z0-9]|g" "$WORKSPACE/backup_test.sh"
 # Set part size to 400k so 1.5MB file produces multiple parts (part-001, part-002, ...)
 sed -i 's|PART_SIZE="500M"|PART_SIZE="400k"|g' "$WORKSPACE/backup_test.sh"
+# Test 1 tests unencrypted backup:
+sed -i 's|ENCRYPT_BACKUPS=true|ENCRYPT_BACKUPS=false|g' "$WORKSPACE/backup_test.sh"
 
 # Replace df input feed with mock data
 sed -i "s~done < <(df -P 2>/dev/null || df)~done < <(printf '%s\n%s\n%s\n' 'Filesystem 1024-blocks Used Available Capacity Mounted on' '/dev/sda1 100000000 50000 95000000 1% ${TEST_ROOT}/storage/8A6E-8771' '/dev/sda3 100000000 10000 95000000 1% ${TEST_ROOT}/storage/831E-10EC')~g" "$WORKSPACE/backup_test.sh"
