@@ -88,15 +88,16 @@ fi
 
 echo "=== 8. Configuring and starting automated cron job ==="
 BASH_PATH="$(command -v bash || echo "${PREFIX:-/data/data/com.termux/files/usr}/bin/bash")"
-CRON_ENTRY="*/5 * * * * $BASH_PATH $HOME/backup.sh >/dev/null 2>&1"
+CRON_ENTRY="* * * * * $BASH_PATH $HOME/backup.sh >/dev/null 2>&1"
 
 if command -v crontab >/dev/null 2>&1; then
-    # Add cron job if not already present
+    # Add or update cron job to run every 1 minute
     if ! crontab -l 2>/dev/null | grep -Fq "backup.sh"; then
         (crontab -l 2>/dev/null || true; echo "$CRON_ENTRY") | crontab -
-        echo "Configured crontab to run backup.sh every 5 minutes."
+        echo "Configured crontab to run backup.sh every 1 minute."
     else
-        echo "Cron job for backup.sh is already configured in crontab."
+        (crontab -l 2>/dev/null | grep -v "backup.sh" || true; echo "$CRON_ENTRY") | crontab -
+        echo "Updated crontab to run backup.sh every 1 minute."
     fi
 fi
 
@@ -134,7 +135,7 @@ echo "  - $HOME/restore.sh         (Multi-part restore & decryption utility)"
 echo "  - $HOME/backup_public_key.pem (Public key certificate)"
 echo ""
 echo " Background Services:"
-echo "  - Automated Cron Job: Active (scanning for pendrives every 5 minutes)"
+echo "  - Automated Cron Job: Active (scanning for pendrives every 1 minute)"
 echo "  - Termux Wake Lock:   Active (keeps CPU running when screen is locked)"
 echo "  - Syncthing:          Running in background (browser auto-open disabled)"
 echo "  - Syncthing Web UI:   http://127.0.0.1:8384"

@@ -56,13 +56,13 @@ bash ~/backup.sh
 ```
 
 ### 2. Automatic Scheduled Backups (Cron)
-The setup script automatically registers the backup job and starts the `crond` daemon to scan every 5 minutes in the background.
+The setup script automatically registers the backup job and starts the `crond` daemon to scan every 1 minute in the background.
 
 To inspect or edit your scheduled cron schedule:
 ```bash
 crontab -l
 ```
-*(The configured entry runs every 5 minutes: `*/5 * * * * ... ~/backup.sh`)*
+*(The configured entry runs every 1 minute: `* * * * * ... ~/backup.sh`)*
 
 ### 3. Restoring Files with `restore.sh`
 To extract original files from a backup folder:
