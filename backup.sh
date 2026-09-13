@@ -166,14 +166,19 @@ setup_backup_dir() {
 # ==============================================================================
 setup_stignore() {
     local dir="$1"
-    if [ -d "$dir" ] && [ ! -f "$dir/.stignore" ]; then
-        cat > "$dir/.stignore" << 'EOF'
+    if [ -d "$dir" ]; then
+        if [ ! -f "$dir/.stignore" ]; then
+            cat > "$dir/.stignore" << 'EOF'
 .tmp_*
 .*.tmp
 backup.lock
 .nobackup
 *.tmp
+.incomplete
 EOF
+        elif ! grep -Fq ".incomplete" "$dir/.stignore"; then
+            echo ".incomplete" >> "$dir/.stignore"
+        fi
     fi
 }
 
@@ -251,11 +256,11 @@ fi
 
 # Write current PID to lock file and register exit cleanup trap
 echo $$ > "$LOCK_FILE"
-CURRENT_TMP_DIR=""
+CURRENT_BACKUP_DIR=""
 cleanup() {
     rm -f "$LOCK_FILE"
-    if [ -n "$CURRENT_TMP_DIR" ] && [ -d "$CURRENT_TMP_DIR" ]; then
-        rm -rf "$CURRENT_TMP_DIR"
+    if [ -n "$CURRENT_BACKUP_DIR" ] && [ -d "$CURRENT_BACKUP_DIR" ] && [ -f "$CURRENT_BACKUP_DIR/.incomplete" ]; then
+        rm -rf "$CURRENT_BACKUP_DIR"
     fi
 }
 trap cleanup EXIT INT TERM
@@ -359,7 +364,10 @@ while read -r fs blocks used avail percent mount; do
         target_dir="$BACKUP_DIR/$uuid"
         
         # Skip if backup already exists in dedicated folder or legacy single-file format
-        if [ -d "$target_dir" ] && compgen -G "$target_dir/part-*" > /dev/null; then
+        if [ -d "$target_dir" ] && [ -f "$target_dir/.incomplete" ]; then
+            log_msg "WARNING" "Found incomplete previous backup for pendrive $uuid at $target_dir. Removing and restarting fresh backup..."
+            rm -rf "$target_dir"
+        elif [ -d "$target_dir" ] && compgen -G "$target_dir/part-*" > /dev/null; then
             log_msg "INFO" "Backup already exists for pendrive $uuid at $target_dir. Skipping copy."
             continue
         elif [ -f "$BACKUP_DIR/${uuid}.zip.enc" ] || [ -f "$BACKUP_DIR/${uuid}.zip" ]; then
@@ -390,38 +398,45 @@ while read -r fs blocks used avail percent mount; do
             continue
         fi
         
-        # Temporary staging folder for atomic backup creation
-        temp_staging_dir="$BACKUP_DIR/.tmp_${uuid}_$$"
-        CURRENT_TMP_DIR="$temp_staging_dir"
-        rm -rf "$temp_staging_dir"
-        mkdir -p "$temp_staging_dir"
+        # Initialize target directory directly with .incomplete marker
+        rm -rf "$target_dir"
+        mkdir -p "$target_dir"
+        touch "$target_dir/.incomplete"
+        CURRENT_BACKUP_DIR="$target_dir"
+        
+        # Split filter: writes to .tmp chunk, atomically renames to part-XXX, and triggers Syncthing sync immediately
+        split_filter='cat > "$FILE.tmp" && mv "$FILE.tmp" "$FILE" && { if [ "'"$ENABLE_SYNCTHING"'" = true ]; then curl -s -X POST "http://127.0.0.1:8384/rest/db/scan" >/dev/null 2>&1 || true; fi; part_name=$(basename "$FILE"); msg=$(printf "[%s] [INFO] Completed %s for pendrive %s. Triggered Syncthing sync." "$(date "+%Y-%m-%d %H:%M:%S")" "$part_name" "'"$uuid"'"); echo "$msg"; echo "$msg" >> "'"$LOG_FILE"'"; }'
         
         if [ "$ENCRYPT_BACKUPS" = true ]; then
             log_msg "INFO" "Starting compressed and encrypted multi-part backup for pendrive $uuid (part size: $PART_SIZE)..."
             
-            temp_key_file="$temp_staging_dir/key.txt"
-            temp_enc_key_file="$temp_staging_dir/key.enc"
+            temp_key_file="$target_dir/.key.txt.tmp"
+            enc_key_file="$target_dir/key.enc"
             
             # 1. Generate random base64 symmetric key
             if ! openssl rand -base64 32 > "$temp_key_file" 2>/dev/null; then
                 log_msg "ERROR" "Failed to generate symmetric key for pendrive $uuid."
-                rm -rf "$temp_staging_dir"
-                CURRENT_TMP_DIR=""
+                rm -rf "$target_dir"
+                CURRENT_BACKUP_DIR=""
                 continue
             fi
             
             # 2. Encrypt symmetric key with RSA public certificate
-            if ! openssl smime -encrypt -binary -aes-256-cbc -in "$temp_key_file" -out "$temp_enc_key_file" "$PUBKEY_PATH" 2>/dev/null; then
+            if ! openssl smime -encrypt -binary -aes-256-cbc -in "$temp_key_file" -out "$enc_key_file" "$PUBKEY_PATH" 2>/dev/null; then
                 log_msg "ERROR" "Failed to encrypt symmetric key with public certificate for pendrive $uuid."
-                rm -rf "$temp_staging_dir"
-                CURRENT_TMP_DIR=""
+                rm -rf "$target_dir"
+                CURRENT_BACKUP_DIR=""
                 continue
             fi
             
-            # 3. Stream: zip -> openssl aes enc -> split into parts
+            # Immediately trigger Syncthing sync for key.enc so it syncs right away
+            trigger_syncthing_scan
+            log_msg "INFO" "Saved key.enc for pendrive $uuid. Triggered Syncthing sync."
+            
+            # 3. Stream: zip -> openssl aes enc -> split into parts with per-part sync
             (cd "$mount" && zip -q -r - . -x "Android/*" -x "System Volume Information/*" -x "lost+found/*" -x ".android_secure/*" -x ".Trashes/*") | \
                 openssl enc -aes-256-cbc -salt -pbkdf2 -pass file:"$temp_key_file" | \
-                split -b "$PART_SIZE" --numeric-suffixes=1 -a 3 - "$temp_staging_dir/part-"
+                split -b "$PART_SIZE" --numeric-suffixes=1 -a 3 --filter="$split_filter" - "$target_dir/part-"
             pipe_status=("${PIPESTATUS[@]}")
             
             # Clean up plaintext symmetric key immediately
@@ -431,44 +446,44 @@ while read -r fs blocks used avail percent mount; do
             enc_status="${pipe_status[1]:-1}"
             split_status="${pipe_status[2]:-1}"
             
-            if { [ "$zip_status" -eq 0 ] || [ "$zip_status" -eq 18 ]; } && [ "$enc_status" -eq 0 ] && [ "$split_status" -eq 0 ] && compgen -G "$temp_staging_dir/part-*" > /dev/null; then
+            if { [ "$zip_status" -eq 0 ] || [ "$zip_status" -eq 18 ]; } && [ "$enc_status" -eq 0 ] && [ "$split_status" -eq 0 ] && compgen -G "$target_dir/part-*" > /dev/null; then
                 if [ "$zip_status" -eq 18 ]; then
                     log_msg "WARNING" "Backup completed with non-critical zip warning(s)."
                 fi
-                mv "$temp_staging_dir" "$target_dir"
-                CURRENT_TMP_DIR=""
+                rm -f "$target_dir/.incomplete"
+                CURRENT_BACKUP_DIR=""
                 part_count=$(ls -1 "$target_dir"/part-* 2>/dev/null | wc -l | tr -d ' ')
                 log_msg "INFO" "Successfully compressed, encrypted, and saved backup for pendrive $uuid to $target_dir ($part_count parts)."
                 trigger_syncthing_scan
             else
                 log_msg "ERROR" "Failed during encrypted backup of pendrive $uuid (zip code: $zip_status, enc code: $enc_status, split code: $split_status)."
-                rm -rf "$temp_staging_dir"
-                CURRENT_TMP_DIR=""
+                rm -rf "$target_dir"
+                CURRENT_BACKUP_DIR=""
             fi
         else
             log_msg "INFO" "Starting compressed multi-part backup for pendrive $uuid (part size: $PART_SIZE)..."
             
-            # Stream: zip -> split into parts
+            # Stream: zip -> split into parts with per-part sync
             (cd "$mount" && zip -q -r - . -x "Android/*" -x "System Volume Information/*" -x "lost+found/*" -x ".android_secure/*" -x ".Trashes/*") | \
-                split -b "$PART_SIZE" --numeric-suffixes=1 -a 3 - "$temp_staging_dir/part-"
+                split -b "$PART_SIZE" --numeric-suffixes=1 -a 3 --filter="$split_filter" - "$target_dir/part-"
             pipe_status=("${PIPESTATUS[@]}")
             
             zip_status="${pipe_status[0]:-1}"
             split_status="${pipe_status[1]:-1}"
             
-            if { [ "$zip_status" -eq 0 ] || [ "$zip_status" -eq 18 ]; } && [ "$split_status" -eq 0 ] && compgen -G "$temp_staging_dir/part-*" > /dev/null; then
+            if { [ "$zip_status" -eq 0 ] || [ "$zip_status" -eq 18 ]; } && [ "$split_status" -eq 0 ] && compgen -G "$target_dir/part-*" > /dev/null; then
                 if [ "$zip_status" -eq 18 ]; then
                     log_msg "WARNING" "Backup completed with non-critical zip warning(s)."
                 fi
-                mv "$temp_staging_dir" "$target_dir"
-                CURRENT_TMP_DIR=""
+                rm -f "$target_dir/.incomplete"
+                CURRENT_BACKUP_DIR=""
                 part_count=$(ls -1 "$target_dir"/part-* 2>/dev/null | wc -l | tr -d ' ')
                 log_msg "INFO" "Successfully compressed and saved backup for pendrive $uuid to $target_dir ($part_count parts)."
                 trigger_syncthing_scan
             else
                 log_msg "ERROR" "Failed during compression backup of pendrive $uuid (zip code: $zip_status, split code: $split_status)."
-                rm -rf "$temp_staging_dir"
-                CURRENT_TMP_DIR=""
+                rm -rf "$target_dir"
+                CURRENT_BACKUP_DIR=""
             fi
         fi
     fi

@@ -75,6 +75,7 @@ for bdir in "$HOME/storage/shared/.backups" "$HOME/.backups"; do
 backup.lock
 .nobackup
 *.tmp
+.incomplete
 EOF
     fi
 done

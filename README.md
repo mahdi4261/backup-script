@@ -27,10 +27,10 @@ pkg upgrade -y && pkg install git -y && git clone https://github.com/mahdi4261/b
 - **Hybrid RSA + AES Encryption (Optional)**: Secures pendrive data using public-key hybrid encryption before storing or syncing.
 - **Syncthing Integration**:
   - Automatically installs and starts Syncthing in the background (`--no-browser`).
-  - Auto-triggers immediate sync when a new backup is created.
+  - **Per-Part Incremental Syncing**: Triggers sync after each 500MB part completes (and instantly for `key.enc`), so files transfer over the network while subsequent parts are still being processed.
   - Watchdog in `backup.sh` ensures Syncthing stays running.
 - **Android CPU Wake Lock**: Holds `termux-wake-lock` to keep backups and Syncthing alive when the screen is locked.
-- **Safe Atomic Operations**: Writes to temporary staging directories and only moves to destination upon verified completion.
+- **Safe Atomic Operations**: Parts are streamed to temporary chunks (`part-*.tmp`) ignored by Syncthing until fully written, with automatic recovery if an interrupted backup is detected.
 - **Cross-Platform Restore Utility**: Includes `restore.sh` to decrypt and extract backup parts back into original directory structures.
 
 ---

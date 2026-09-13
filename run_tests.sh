@@ -82,6 +82,11 @@ echo "Verification 1.3: Comparing restored files byte-for-byte with original sou
 diff -r "$TEST_ROOT/storage/8A6E-8771" "$RESTORE_OUT_1"
 echo "PASS: Restored unencrypted files match original pendrive perfectly!"
 
+echo "Verification 1.4: Verifying per-part Syncthing sync was triggered..."
+grep -q "Completed part-001 for pendrive 8A6E-8771. Triggered Syncthing sync." "$TEST_ROOT/home/.logs/pendrive_backup.log"
+grep -q "Completed part-002 for pendrive 8A6E-8771. Triggered Syncthing sync." "$TEST_ROOT/home/.logs/pendrive_backup.log"
+echo "PASS: Per-part Syncthing sync verified in log file!"
+
 echo "======================================================================"
 echo "Test 2: Running encrypted multi-part backup..."
 echo "======================================================================"
@@ -107,6 +112,11 @@ echo "Verification 2.3: Comparing restored encrypted files byte-for-byte with or
 diff -r "$TEST_ROOT/storage/1234-5678" "$RESTORE_OUT_2"
 echo "PASS: Restored encrypted files match original pendrive perfectly!"
 
+echo "Verification 2.4: Verifying key.enc and per-part Syncthing sync for encrypted backup..."
+grep -q "Saved key.enc for pendrive 1234-5678. Triggered Syncthing sync." "$TEST_ROOT/home/.logs/pendrive_backup.log"
+grep -q "Completed part-001 for pendrive 1234-5678. Triggered Syncthing sync." "$TEST_ROOT/home/.logs/pendrive_backup.log"
+echo "PASS: Encrypted key.enc and per-part sync verified!"
+
 echo "======================================================================"
 echo "Test 3: Verify Skip Logic on Existing Backups"
 echo "======================================================================"
@@ -115,7 +125,17 @@ grep -q "Backup already exists for pendrive 8A6E-8771" "$TEST_ROOT/home/.logs/pe
 echo "PASS: Skip logic verified in log file!"
 
 echo "======================================================================"
-echo "Test 4: Verify Log Rotation"
+echo "Test 4: Verify Incomplete Backup Cleanup & Recovery"
+echo "======================================================================"
+# Simulate an interrupted/incomplete backup
+touch "$TEST_ROOT/home/storage/shared/.backups/8A6E-8771/.incomplete"
+HOME="$TEST_ROOT/home" "$WORKSPACE/backup_test.sh"
+grep -q "Found incomplete previous backup for pendrive 8A6E-8771" "$TEST_ROOT/home/.logs/pendrive_backup.log"
+test ! -f "$TEST_ROOT/home/storage/shared/.backups/8A6E-8771/.incomplete"
+echo "PASS: Incomplete backup cleanup and recovery verified!"
+
+echo "======================================================================"
+echo "Test 5: Verify Log Rotation"
 echo "======================================================================"
 sed -i 's|MAX_LOG_SIZE=.*|MAX_LOG_SIZE=300|g' "$WORKSPACE/backup_test.sh"
 rm -f "$TEST_ROOT/home/.logs/pendrive_backup.log" "$TEST_ROOT/home/.logs/pendrive_backup.log.old"
