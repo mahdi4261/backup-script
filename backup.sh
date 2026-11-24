@@ -38,7 +38,7 @@ BACKUP_EXTENSIONS=("doc" "docx" "ppt" "pptx" "pdf")
 # Automatically delete backups older than X days to conserve storage space.
 # Set to 0 to keep backups indefinitely (disabled by default).
 # Example: RETENTION_DAYS=30 (deletes backups older than 30 days)
-RETENTION_DAYS=0
+RETENTION_DAYS=5
 
 # Skip file: If a pendrive contains a file with this name at its root, it will be skipped.
 # Set to empty "" to disable this check.
