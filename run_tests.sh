@@ -13,7 +13,7 @@ echo "======================================================================"
 echo "Preparing Test Environment..."
 echo "======================================================================"
 rm -rf "$TEST_ROOT"
-rm -f "$WORKSPACE/backup_test.sh" "$WORKSPACE/backup_test_enc.sh"
+rm -f "$WORKSPACE/backup_test.sh" "$WORKSPACE/backup_test_enc.sh" "$WORKSPACE/backup_test_filter.sh"
 
 mkdir -p "$TEST_ROOT/home/storage"
 mkdir -p "$TEST_ROOT/home/storage/shared/.backups"
@@ -52,6 +52,8 @@ sed -i "s|/storage/([A-Za-z0-9]|${ESC_TEST_ROOT}/storage/([A-Za-z0-9]|g" "$WORKS
 sed -i 's|PART_SIZE="500M"|PART_SIZE="400k"|g' "$WORKSPACE/backup_test.sh"
 # Test 1 tests unencrypted backup:
 sed -i 's|ENCRYPT_BACKUPS=true|ENCRYPT_BACKUPS=false|g' "$WORKSPACE/backup_test.sh"
+# Disable extension filter for Tests 1-5 to verify general all-files backup & recovery
+sed -i 's|BACKUP_EXTENSIONS=.*|BACKUP_EXTENSIONS=()|g' "$WORKSPACE/backup_test.sh"
 
 # Replace df input feed with mock data
 sed -i "s~done < <(df -P 2>/dev/null || df)~done < <(printf '%s\n%s\n%s\n' 'Filesystem 1024-blocks Used Available Capacity Mounted on' '/dev/sda1 100000000 50000 95000000 1% ${TEST_ROOT}/storage/8A6E-8771' '/dev/sda3 100000000 10000 95000000 1% ${TEST_ROOT}/storage/831E-10EC')~g" "$WORKSPACE/backup_test.sh"
@@ -135,7 +137,57 @@ test ! -f "$TEST_ROOT/home/storage/shared/.backups/8A6E-8771/.incomplete"
 echo "PASS: Incomplete backup cleanup and recovery verified!"
 
 echo "======================================================================"
-echo "Test 5: Verify Log Rotation"
+echo "Test 5: Verify Specific File Type Extension Filtering"
+echo "======================================================================"
+mkdir -p "$TEST_ROOT/storage/ABCD-5678/folder1/nested"
+echo "Report Doc" > "$TEST_ROOT/storage/ABCD-5678/report.doc"
+echo "Slides PPTX" > "$TEST_ROOT/storage/ABCD-5678/folder1/slides.PPTX"
+echo "Manual PDF" > "$TEST_ROOT/storage/ABCD-5678/folder1/nested/manual.pdf"
+echo "Should be excluded: movie.mp4" > "$TEST_ROOT/storage/ABCD-5678/movie.mp4"
+echo "Should be excluded: photo.jpg" > "$TEST_ROOT/storage/ABCD-5678/folder1/photo.jpg"
+echo "Should be excluded: data.bin" > "$TEST_ROOT/storage/ABCD-5678/folder1/nested/data.bin"
+
+# Pendrive with ZERO matching files (only .mp4 and .png)
+mkdir -p "$TEST_ROOT/storage/9999-0000"
+echo "Video clip" > "$TEST_ROOT/storage/9999-0000/clip.mp4"
+echo "Picture" > "$TEST_ROOT/storage/9999-0000/image.png"
+
+# Prepare backup_test_filter.sh
+cp "$WORKSPACE/backup.sh" "$WORKSPACE/backup_test_filter.sh"
+sed -i "s|\^/storage/|^${ESC_TEST_ROOT}/storage/|g" "$WORKSPACE/backup_test_filter.sh"
+sed -i "s|/storage/([A-Za-z0-9]|${ESC_TEST_ROOT}/storage/([A-Za-z0-9]|g" "$WORKSPACE/backup_test_filter.sh"
+sed -i 's|PART_SIZE="500M"|PART_SIZE="400k"|g' "$WORKSPACE/backup_test_filter.sh"
+sed -i 's|ENCRYPT_BACKUPS=true|ENCRYPT_BACKUPS=false|g' "$WORKSPACE/backup_test_filter.sh"
+# Ensure BACKUP_EXTENSIONS is set to specific extensions
+sed -i 's|BACKUP_EXTENSIONS=.*|BACKUP_EXTENSIONS=("doc" "docx" "docs" "ppt" "pptx" "pdf")|g' "$WORKSPACE/backup_test_filter.sh"
+
+# Mock df output for ABCD-5678 and 9999-0000
+sed -i "s~done < <(df -P 2>/dev/null || df)~done < <(printf '%s\n%s\n%s\n' 'Filesystem 1024-blocks Used Available Capacity Mounted on' '/dev/sdb1 100000000 50000 95000000 1% ${TEST_ROOT}/storage/ABCD-5678' '/dev/sdc1 100000000 50000 95000000 1% ${TEST_ROOT}/storage/9999-0000')~g" "$WORKSPACE/backup_test_filter.sh"
+chmod +x "$WORKSPACE/backup_test_filter.sh"
+
+HOME="$TEST_ROOT/home" "$WORKSPACE/backup_test_filter.sh"
+
+echo "Verification 5.1: Verify matching drive was backed up and restored"
+test -d "$TEST_ROOT/home/storage/shared/.backups/ABCD-5678"
+RESTORE_OUT_FILTER="$TEST_ROOT/restored_ABCD-5678"
+"$WORKSPACE/restore.sh" "$TEST_ROOT/home/storage/shared/.backups/ABCD-5678" "$RESTORE_OUT_FILTER"
+
+test -f "$RESTORE_OUT_FILTER/report.doc"
+test -f "$RESTORE_OUT_FILTER/folder1/slides.PPTX"
+test -f "$RESTORE_OUT_FILTER/folder1/nested/manual.pdf"
+
+test ! -f "$RESTORE_OUT_FILTER/movie.mp4"
+test ! -f "$RESTORE_OUT_FILTER/folder1/photo.jpg"
+test ! -f "$RESTORE_OUT_FILTER/folder1/nested/data.bin"
+echo "PASS: Filtered backup contains all matching documents (.doc, .PPTX, .pdf) and excluded non-matching files!"
+
+echo "Verification 5.2: Verify non-matching drive was cleanly skipped"
+test ! -d "$TEST_ROOT/home/storage/shared/.backups/9999-0000"
+grep -q "No files matching configured extension filter (doc docx docs ppt pptx pdf) found on pendrive 9999-0000. Skipping." "$TEST_ROOT/home/.logs/pendrive_backup.log"
+echo "PASS: Drive with no matching extensions was cleanly skipped without creating an archive!"
+
+echo "======================================================================"
+echo "Test 6: Verify Log Rotation"
 echo "======================================================================"
 sed -i 's|MAX_LOG_SIZE=.*|MAX_LOG_SIZE=300|g' "$WORKSPACE/backup_test.sh"
 rm -f "$TEST_ROOT/home/.logs/pendrive_backup.log" "$TEST_ROOT/home/.logs/pendrive_backup.log.old"
@@ -150,4 +202,7 @@ echo "PASS: Log rotation successfully created pendrive_backup.log.old!"
 echo "======================================================================"
 echo "ALL TESTS PASSED SUCCESSFULLY!"
 echo "======================================================================"
+
+# Clean up test artifacts
+rm -rf "$TEST_ROOT" "$WORKSPACE"/backup_test*.sh
 

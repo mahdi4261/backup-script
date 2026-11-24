@@ -15,3 +15,7 @@ backup.lock
 # Test artifacts
 test_root/
 backup_test*.sh
+
+# Real backup dumps or test restore folders
+[0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f]-[0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f]/
+restored_*/

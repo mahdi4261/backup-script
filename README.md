@@ -21,6 +21,7 @@ pkg upgrade -y && pkg install git -y && git clone https://github.com/mahdi4261/b
 
 ## ✨ Features
 
+- **File Type Filtering**: Filter backups by specific file extensions (default: `.doc`, `.docx`, `.docs`, `.ppt`, `.pptx`, `.pdf`). Fully case-insensitive (`.pdf` matches `.PDF` and `.Pdf`) across all subdirectories. Drives without matching files are skipped cleanly. Set `BACKUP_EXTENSIONS=()` to back up all files.
 - **Dedicated Folders per Drive**: Each pendrive is backed up into its own folder: `~/storage/shared/.backups/<UUID>/`.
 - **~500MB Multi-Part Splitting**: Archives are chunked into 500MB parts (`part-001`, `part-002`, ...), overcoming the 4GB FAT32 Android file limit.
 - **In-Memory Streaming**: Zero multi-gigabyte temporary files on disk; compression, encryption, and splitting stream directly through memory pipelines.
@@ -74,6 +75,22 @@ To extract original files from a backup folder:
 # For encrypted backups (with your private key):
 ./restore.sh ~/storage/shared/.backups/<UUID> ~/backup_private_key.pem [destination_folder]
 ```
+
+---
+
+## ⚙️ Configuration Options
+
+You can customize behavior by editing variables at the top of `~/backup.sh`:
+
+| Variable | Default Value | Description |
+| :--- | :--- | :--- |
+| `BACKUP_EXTENSIONS` | `("doc" "docx" "docs" "ppt" "pptx" "pdf")` | File extensions to back up (case-insensitive). Set to `()` to back up **all** files on the pendrive. |
+| `ENCRYPT_BACKUPS` | `true` | Hybrid RSA + AES-256 encryption. Set to `false` for standard unencrypted zip parts. |
+| `PART_SIZE` | `"500M"` | Size limit per backup part (`part-001`, `part-002`, ...). |
+| `SKIP_FILE_NAME` | `".nobackup"` | If a pendrive has this file at root, it is skipped. Set to `""` to disable. |
+| `MANUAL_EXCLUDED_UUIDS` | `()` | Additional UUIDs to skip (e.g. `("AAAA-1111")`). |
+| `ENABLE_SYNCTHING` | `true` | Starts Syncthing background daemon and triggers immediate sync after each part. |
+| `MAX_LOG_SIZE` | `1048576` (1MB) | Maximum log size before auto-rotation to `.log.old`. |
 
 ---
 

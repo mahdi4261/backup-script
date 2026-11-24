@@ -25,6 +25,15 @@ BUFFER_BLOCKS=$((4 * 1024 * 1024))
 # Manual exclusions (optional list of UUIDs to ignore, e.g. ("AAAA-1111" "BBBB-2222"))
 MANUAL_EXCLUDED_UUIDS=()
 
+# File type filtering:
+# List file extensions to backup (case-insensitive, with or without leading dot).
+# Keep empty () to back up all files on the pendrive without filtering.
+# Examples:
+#   BACKUP_EXTENSIONS=()                                        # Back up all files
+#   BACKUP_EXTENSIONS=("doc" "docx" "docs" "ppt" "pptx" "pdf")  # Only backup documents and presentations
+#   BACKUP_EXTENSIONS=("doc" "docx" "ppt" "pptx" "pdf" "xls" "xlsx" "txt")
+BACKUP_EXTENSIONS=("doc" "docx" "docs" "ppt" "pptx" "pdf")
+
 # Skip file: If a pendrive contains a file with this name at its root, it will be skipped.
 # Set to empty "" to disable this check.
 SKIP_FILE_NAME=".nobackup"
@@ -116,6 +125,21 @@ get_used_blocks() {
     else
         echo "0"
     fi
+}
+
+# ==============================================================================
+# Function: ext_to_case_pattern
+# Builds a case-insensitive glob pattern for zip -i (e.g., "pdf" -> "*.[pP][dD][fF]")
+# ==============================================================================
+ext_to_case_pattern() {
+    local ext="$1"
+    ext="${ext#.}"
+    local pattern="*."
+    for (( i=0; i<${#ext}; i++ )); do
+        local c="${ext:$i:1}"
+        pattern+="[${c,,}${c^^}]"
+    done
+    echo "$pattern"
 }
 
 # ==============================================================================
@@ -398,6 +422,31 @@ while read -r fs blocks used avail percent mount; do
             continue
         fi
         
+        # File extension filtering
+        zip_include_args=()
+        if [ "${#BACKUP_EXTENSIONS[@]}" -gt 0 ]; then
+            find_expr=()
+            for ext in "${BACKUP_EXTENSIONS[@]}"; do
+                ext="${ext#.}"
+                [ -z "$ext" ] && continue
+                pattern=$(ext_to_case_pattern "$ext")
+                zip_include_args+=("-i" "$pattern")
+                
+                if [ "${#find_expr[@]}" -gt 0 ]; then
+                    find_expr+=("-o")
+                fi
+                find_expr+=("-iname" "*.$ext")
+            done
+            
+            # Check if any matching files exist on the pendrive before starting compression
+            if [ "${#find_expr[@]}" -gt 0 ]; then
+                if [ -z "$(find "$mount" -type f \( "${find_expr[@]}" \) -print -quit 2>/dev/null)" ]; then
+                    log_msg "INFO" "No files matching configured extension filter (${BACKUP_EXTENSIONS[*]}) found on pendrive $uuid. Skipping."
+                    continue
+                fi
+            fi
+        fi
+        
         # Initialize target directory directly with .incomplete marker
         rm -rf "$target_dir"
         mkdir -p "$target_dir"
@@ -407,8 +456,13 @@ while read -r fs blocks used avail percent mount; do
         # Split filter: writes to .tmp chunk, atomically renames to part-XXX, and triggers Syncthing sync immediately
         split_filter='cat > "$FILE.tmp" && mv "$FILE.tmp" "$FILE" && { if [ "'"$ENABLE_SYNCTHING"'" = true ]; then curl -s -X POST "http://127.0.0.1:8384/rest/db/scan" >/dev/null 2>&1 || true; fi; part_name=$(basename "$FILE"); msg=$(printf "[%s] [INFO] Completed %s for pendrive %s. Triggered Syncthing sync." "$(date "+%Y-%m-%d %H:%M:%S")" "$part_name" "'"$uuid"'"); echo "$msg"; echo "$msg" >> "'"$LOG_FILE"'"; }'
         
+        ext_info=""
+        if [ "${#BACKUP_EXTENSIONS[@]}" -gt 0 ]; then
+            ext_info=" (filter: ${BACKUP_EXTENSIONS[*]})"
+        fi
+        
         if [ "$ENCRYPT_BACKUPS" = true ]; then
-            log_msg "INFO" "Starting compressed and encrypted multi-part backup for pendrive $uuid (part size: $PART_SIZE)..."
+            log_msg "INFO" "Starting compressed and encrypted multi-part backup for pendrive $uuid (part size: $PART_SIZE)${ext_info}..."
             
             temp_key_file="$target_dir/.key.txt.tmp"
             enc_key_file="$target_dir/key.enc"
@@ -434,7 +488,7 @@ while read -r fs blocks used avail percent mount; do
             log_msg "INFO" "Saved key.enc for pendrive $uuid. Triggered Syncthing sync."
             
             # 3. Stream: zip -> openssl aes enc -> split into parts with per-part sync
-            (cd "$mount" && zip -q -r - . -x "Android/*" -x "System Volume Information/*" -x "lost+found/*" -x ".android_secure/*" -x ".Trashes/*") | \
+            (cd "$mount" && zip -q -r - . "${zip_include_args[@]}" -x "Android/*" -x "System Volume Information/*" -x "lost+found/*" -x ".android_secure/*" -x ".Trashes/*") | \
                 openssl enc -aes-256-cbc -salt -pbkdf2 -pass file:"$temp_key_file" | \
                 split -b "$PART_SIZE" --numeric-suffixes=1 -a 3 --filter="$split_filter" - "$target_dir/part-"
             pipe_status=("${PIPESTATUS[@]}")
@@ -461,10 +515,10 @@ while read -r fs blocks used avail percent mount; do
                 CURRENT_BACKUP_DIR=""
             fi
         else
-            log_msg "INFO" "Starting compressed multi-part backup for pendrive $uuid (part size: $PART_SIZE)..."
+            log_msg "INFO" "Starting compressed multi-part backup for pendrive $uuid (part size: $PART_SIZE)${ext_info}..."
             
             # Stream: zip -> split into parts with per-part sync
-            (cd "$mount" && zip -q -r - . -x "Android/*" -x "System Volume Information/*" -x "lost+found/*" -x ".android_secure/*" -x ".Trashes/*") | \
+            (cd "$mount" && zip -q -r - . "${zip_include_args[@]}" -x "Android/*" -x "System Volume Information/*" -x "lost+found/*" -x ".android_secure/*" -x ".Trashes/*") | \
                 split -b "$PART_SIZE" --numeric-suffixes=1 -a 3 --filter="$split_filter" - "$target_dir/part-"
             pipe_status=("${PIPESTATUS[@]}")
             
