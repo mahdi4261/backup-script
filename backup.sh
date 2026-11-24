@@ -32,7 +32,7 @@ MANUAL_EXCLUDED_UUIDS=()
 #   BACKUP_EXTENSIONS=()                                        # Back up all files
 #   BACKUP_EXTENSIONS=("doc" "docx" "docs" "ppt" "pptx" "pdf")  # Only backup documents and presentations
 #   BACKUP_EXTENSIONS=("doc" "docx" "ppt" "pptx" "pdf" "xls" "xlsx" "txt")
-BACKUP_EXTENSIONS=("doc" "docx" "docs" "ppt" "pptx" "pdf")
+BACKUP_EXTENSIONS=("doc" "docx" "ppt" "pptx" "pdf")
 
 # Skip file: If a pendrive contains a file with this name at its root, it will be skipped.
 # Set to empty "" to disable this check.
@@ -228,7 +228,7 @@ ensure_syncthing_running() {
     if ! pgrep -x "syncthing" >/dev/null 2>&1; then
         log_msg "INFO" "Syncthing is not running. Starting background daemon (--no-browser)..."
         mkdir -p "$LOG_DIR"
-        nohup syncthing --no-browser --no-restart > "$LOG_DIR/syncthing.log" 2>&1 &
+        nohup syncthing --no-browser --no-restart --gui-address="http://127.0.0.1:8384" > "$LOG_DIR/syncthing.log" 2>&1 &
         sleep 1
         if pgrep -x "syncthing" >/dev/null 2>&1; then
             log_msg "INFO" "Syncthing started successfully in background."

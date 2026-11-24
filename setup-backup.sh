@@ -83,7 +83,7 @@ done
 echo "=== 7. Starting Syncthing daemon in background (headless) ==="
 mkdir -p "$HOME/.logs"
 if ! pgrep -x "syncthing" >/dev/null 2>&1; then
-    nohup syncthing --no-browser --no-restart > "$HOME/.logs/syncthing.log" 2>&1 &
+    nohup syncthing --no-browser --no-restart --gui-address="http://127.0.0.1:8384" > "$HOME/.logs/syncthing.log" 2>&1 &
     sleep 2
 fi
 
@@ -122,7 +122,7 @@ if ! grep -Fq "$AUTOSTART_MARKER" "$BASHRC" 2>/dev/null; then
 # Pendrive Backup & Syncthing background services
 termux-wake-lock 2>/dev/null || true
 pgrep -x "crond" >/dev/null 2>&1 || crond
-pgrep -x "syncthing" >/dev/null 2>&1 || nohup syncthing --no-browser --no-restart > "$HOME/.logs/syncthing.log" 2>&1 &
+pgrep -x "syncthing" >/dev/null 2>&1 || nohup syncthing --no-browser --no-restart --gui-address="http://127.0.0.1:8384" > "$HOME/.logs/syncthing.log" 2>&1 &
 EOF
     echo "Added auto-start hook to ~/.bashrc (starts crond & Syncthing whenever Termux opens)."
 fi
