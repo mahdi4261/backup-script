@@ -187,7 +187,53 @@ grep -q "No files matching configured extension filter (doc docx docs ppt pptx p
 echo "PASS: Drive with no matching extensions was cleanly skipped without creating an archive!"
 
 echo "======================================================================"
-echo "Test 6: Verify Log Rotation"
+echo "Test 6: Verify Backup Retention Auto-Deletion (Older than X Days)"
+echo "======================================================================"
+# Create mock expired backup folder (modified 35 days ago)
+mkdir -p "$TEST_ROOT/home/storage/shared/.backups/OLD-DRIVE-1"
+echo "Old part" > "$TEST_ROOT/home/storage/shared/.backups/OLD-DRIVE-1/part-001"
+echo "Old key" > "$TEST_ROOT/home/storage/shared/.backups/OLD-DRIVE-1/key.enc"
+touch -d "35 days ago" "$TEST_ROOT/home/storage/shared/.backups/OLD-DRIVE-1/part-001"
+touch -d "35 days ago" "$TEST_ROOT/home/storage/shared/.backups/OLD-DRIVE-1/key.enc"
+
+# Create mock fresh backup folder (modified 5 days ago)
+mkdir -p "$TEST_ROOT/home/storage/shared/.backups/NEW-DRIVE-2"
+echo "New part" > "$TEST_ROOT/home/storage/shared/.backups/NEW-DRIVE-2/part-001"
+touch -d "5 days ago" "$TEST_ROOT/home/storage/shared/.backups/NEW-DRIVE-2/part-001"
+
+# Create mock expired legacy archive
+echo "Legacy zip" > "$TEST_ROOT/home/storage/shared/.backups/legacy-old.zip"
+touch -d "35 days ago" "$TEST_ROOT/home/storage/shared/.backups/legacy-old.zip"
+
+# Prepare test script with RETENTION_DAYS=30
+cp "$WORKSPACE/backup.sh" "$WORKSPACE/backup_test_retention.sh"
+sed -i "s|\^/storage/|^${ESC_TEST_ROOT}/storage/|g" "$WORKSPACE/backup_test_retention.sh"
+sed -i "s|/storage/([A-Za-z0-9]|${ESC_TEST_ROOT}/storage/([A-Za-z0-9]|g" "$WORKSPACE/backup_test_retention.sh"
+sed -i 's|RETENTION_DAYS=0|RETENTION_DAYS=30|g' "$WORKSPACE/backup_test_retention.sh"
+sed -i "s~done < <(df -P 2>/dev/null || df)~done < <(printf '%s\n' 'Filesystem 1024-blocks Used Available Capacity Mounted on')~g" "$WORKSPACE/backup_test_retention.sh"
+chmod +x "$WORKSPACE/backup_test_retention.sh"
+
+HOME="$TEST_ROOT/home" "$WORKSPACE/backup_test_retention.sh"
+
+echo "Verification 6.1: Verify expired backup directory was deleted"
+test ! -d "$TEST_ROOT/home/storage/shared/.backups/OLD-DRIVE-1"
+echo "PASS: Expired backup directory OLD-DRIVE-1 was successfully deleted!"
+
+echo "Verification 6.2: Verify expired legacy zip was deleted"
+test ! -f "$TEST_ROOT/home/storage/shared/.backups/legacy-old.zip"
+echo "PASS: Expired legacy archive was successfully deleted!"
+
+echo "Verification 6.3: Verify fresh backup was preserved"
+test -d "$TEST_ROOT/home/storage/shared/.backups/NEW-DRIVE-2"
+test -f "$TEST_ROOT/home/storage/shared/.backups/NEW-DRIVE-2/part-001"
+echo "PASS: Fresh backup within retention period was safely preserved!"
+
+echo "Verification 6.4: Verify retention log messages"
+grep -q "Backup for pendrive OLD-DRIVE-1 is older than 30 days. Deleting" "$TEST_ROOT/home/.logs/pendrive_backup.log"
+echo "PASS: Retention cleanup log messages verified!"
+
+echo "======================================================================"
+echo "Test 7: Verify Log Rotation"
 echo "======================================================================"
 sed -i 's|MAX_LOG_SIZE=.*|MAX_LOG_SIZE=300|g' "$WORKSPACE/backup_test.sh"
 rm -f "$TEST_ROOT/home/.logs/pendrive_backup.log" "$TEST_ROOT/home/.logs/pendrive_backup.log.old"

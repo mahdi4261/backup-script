@@ -34,6 +34,12 @@ MANUAL_EXCLUDED_UUIDS=()
 #   BACKUP_EXTENSIONS=("doc" "docx" "ppt" "pptx" "pdf" "xls" "xlsx" "txt")
 BACKUP_EXTENSIONS=("doc" "docx" "ppt" "pptx" "pdf")
 
+# Backup retention policy:
+# Automatically delete backups older than X days to conserve storage space.
+# Set to 0 to keep backups indefinitely (disabled by default).
+# Example: RETENTION_DAYS=30 (deletes backups older than 30 days)
+RETENTION_DAYS=0
+
 # Skip file: If a pendrive contains a file with this name at its root, it will be skipped.
 # Set to empty "" to disable this check.
 SKIP_FILE_NAME=".nobackup"
@@ -257,6 +263,58 @@ trigger_syncthing_scan() {
 }
 
 # ==============================================================================
+# Function: cleanup_old_backups
+# Deletes backups older than RETENTION_DAYS days to conserve storage space.
+# Skips if RETENTION_DAYS is not a positive integer.
+# ==============================================================================
+cleanup_old_backups() {
+    # Check if RETENTION_DAYS is set to a valid integer greater than 0
+    if [[ ! "$RETENTION_DAYS" =~ ^[0-9]+$ ]] || [ "$RETENTION_DAYS" -le 0 ]; then
+        return 0
+    fi
+    
+    [ -d "$BACKUP_DIR" ] || return 0
+    
+    log_msg "INFO" "Checking for old backups exceeding retention period ($RETENTION_DAYS days)..."
+    local deleted_count=0
+    
+    # 1. Clean up dedicated backup directories (<UUID>)
+    for dir in "$BACKUP_DIR"/*; do
+        [ -d "$dir" ] || continue
+        local dir_name
+        dir_name=$(basename "$dir")
+        
+        # Never delete special or hidden system directories
+        [[ "$dir_name" =~ ^\. ]] && continue
+        
+        # Verify it looks like a pendrive backup folder (contains part-* or key.enc)
+        if compgen -G "$dir/part-*" > /dev/null || [ -f "$dir/key.enc" ]; then
+            # If no files in this directory were modified within the last RETENTION_DAYS days, it's expired
+            if [ -z "$(find "$dir" -maxdepth 1 -type f -mtime "-$RETENTION_DAYS" 2>/dev/null)" ]; then
+                log_msg "INFO" "Backup for pendrive $dir_name is older than $RETENTION_DAYS days. Deleting $dir..."
+                rm -rf "$dir"
+                deleted_count=$((deleted_count + 1))
+            fi
+        fi
+    done
+    
+    # 2. Clean up legacy single-file archives (*.zip, *.zip.enc)
+    for archive in "$BACKUP_DIR"/*.zip "$BACKUP_DIR"/*.zip.enc; do
+        [ -f "$archive" ] || continue
+        if [ -n "$(find "$archive" -mtime "+$RETENTION_DAYS" 2>/dev/null)" ]; then
+            log_msg "INFO" "Legacy backup archive $(basename "$archive") is older than $RETENTION_DAYS days. Deleting..."
+            rm -f "$archive"
+            deleted_count=$((deleted_count + 1))
+        fi
+    done
+    
+    if [ "$deleted_count" -gt 0 ]; then
+        log_msg "INFO" "Retention cleanup completed. Deleted $deleted_count old backup(s)."
+        trigger_syncthing_scan
+    fi
+}
+
+# ==============================================================================
 # Main execution flow
 # ==============================================================================
 
@@ -299,6 +357,9 @@ fi
 if ! setup_backup_dir; then
     exit 1
 fi
+
+# Run retention cleanup to remove backups older than RETENTION_DAYS
+cleanup_old_backups
 
 # 2. Check if required packages are installed
 if ! command -v zip >/dev/null 2>&1; then

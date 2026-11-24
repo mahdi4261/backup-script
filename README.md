@@ -22,6 +22,7 @@ pkg upgrade -y && pkg install git -y && git clone https://github.com/mahdi4261/b
 ## ✨ Features
 
 - **File Type Filtering**: Filter backups by specific file extensions (default: `.doc`, `.docx`, `.docs`, `.ppt`, `.pptx`, `.pdf`). Fully case-insensitive (`.pdf` matches `.PDF` and `.Pdf`) across all subdirectories. Drives without matching files are skipped cleanly. Set `BACKUP_EXTENSIONS=()` to back up all files.
+- **Configurable Retention Policy (Auto-Delete)**: Option to automatically purge backups older than X days (`RETENTION_DAYS=30`). Set to `0` to keep backups indefinitely.
 - **Dedicated Folders per Drive**: Each pendrive is backed up into its own folder: `~/storage/shared/.backups/<UUID>/`.
 - **~500MB Multi-Part Splitting**: Archives are chunked into 500MB parts (`part-001`, `part-002`, ...), overcoming the 4GB FAT32 Android file limit.
 - **In-Memory Streaming**: Zero multi-gigabyte temporary files on disk; compression, encryption, and splitting stream directly through memory pipelines.
@@ -85,6 +86,7 @@ You can customize behavior by editing variables at the top of `~/backup.sh`:
 | Variable | Default Value | Description |
 | :--- | :--- | :--- |
 | `BACKUP_EXTENSIONS` | `("doc" "docx" "docs" "ppt" "pptx" "pdf")` | File extensions to back up (case-insensitive). Set to `()` to back up **all** files on the pendrive. |
+| `RETENTION_DAYS` | `0` | Number of days to keep backups (e.g. `30`). Backups older than this are auto-deleted. Set to `0` to keep indefinitely. |
 | `ENCRYPT_BACKUPS` | `true` | Hybrid RSA + AES-256 encryption. Set to `false` for standard unencrypted zip parts. |
 | `PART_SIZE` | `"500M"` | Size limit per backup part (`part-001`, `part-002`, ...). |
 | `SKIP_FILE_NAME` | `".nobackup"` | If a pendrive has this file at root, it is skipped. Set to `""` to disable. |
